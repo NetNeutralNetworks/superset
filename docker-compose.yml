@@ -33,12 +33,24 @@ services:
     image: nginx:latest
     container_name: superset_nginx
     restart: unless-stopped
-    ports:
-      - "80:80"
+#    ports:
+#      - "80:80"
     extra_hosts:
       - "host.docker.internal:host-gateway"
     volumes:
       - ./docker/nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+    networks:
+      - superset
+      - netcube
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.superset.entrypoints=websecure"
+      - "traefik.http.routers.superset.rule=Host(`${DNS_NAME}`)"
+      - "traefik.http.routers.superset.tls=true"
+      - "traefik.http.services.superset.loadbalancer.server.port=80"
+      - "traefik.docker.network=netcube"
+
+
   redis:
     image: redis:7
     container_name: superset_cache
@@ -47,6 +59,8 @@ services:
       - "127.0.0.1:6379:6379"
     volumes:
       - redis:/data
+    networks:
+      - superset
 
   db:
     env_file: docker/.env
@@ -58,6 +72,8 @@ services:
     volumes:
       - db_home:/var/lib/postgresql/data
       - ./docker/docker-entrypoint-initdb.d:/docker-entrypoint-initdb.d
+    networks:
+      - superset
 
   superset:
     env_file: docker/.env
@@ -74,6 +90,8 @@ services:
     volumes: *superset-volumes
     environment:
       CYPRESS_CONFIG: "${CYPRESS_CONFIG}"
+    networks:
+      - superset
 
   superset-websocket:
     container_name: superset_websocket
@@ -104,6 +122,8 @@ services:
       - REDIS_HOST=redis
       - REDIS_PORT=6379
       - REDIS_SSL=false
+    networks:
+      - superset
 
   superset-init:
     image: *superset-image
@@ -117,6 +137,8 @@ services:
       CYPRESS_CONFIG: "${CYPRESS_CONFIG}"
     healthcheck:
       disable: true
+    networks:
+      - superset
 
   superset-node:
     image: node:16
@@ -125,6 +147,8 @@ services:
     env_file: docker/.env
     depends_on: *superset-depends-on
     volumes: *superset-volumes
+    networks:
+      - superset
 
   superset-worker:
     image: *superset-image
@@ -142,6 +166,8 @@ services:
     # Bump memory limit if processing selenium / thumbnails on superset-worker
     # mem_limit: 2038m
     # mem_reservation: 128M
+    networks:
+      - superset
 
   superset-worker-beat:
     image: *superset-image
@@ -154,6 +180,8 @@ services:
     volumes: *superset-volumes
     healthcheck:
       disable: true
+    networks:
+      - superset
 
   superset-tests-worker:
     image: *superset-image
@@ -166,12 +194,14 @@ services:
       REDIS_CELERY_DB: 2
       REDIS_RESULTS_DB: 3
       REDIS_HOST: localhost
-    network_mode: host
+    #network_mode: host
     depends_on: *superset-depends-on
     user: *superset-user
     volumes: *superset-volumes
     healthcheck:
       test: ["CMD-SHELL", "celery inspect ping -A superset.tasks.celery_app:app -d celery@$$HOSTNAME"]
+    networks:
+      - superset
 
 volumes:
   superset_home:
@@ -180,3 +210,12 @@ volumes:
     external: false
   redis:
     external: false
+
+networks:
+  netcube:
+    name: netcube
+    external: true
+  superset:
+    name: superset
+#    enable_ipv6: true
+    driver: bridge
