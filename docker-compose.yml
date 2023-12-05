@@ -14,7 +14,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 #
-x-superset-image: &superset-image apachesuperset.docker.scarf.sh/apache/superset:${TAG:-latest-dev}
+#x-superset-image: &superset-image apachesuperset.docker.scarf.sh/apache/superset:${TAG:-latest-dev}
+#x-superset-image: &superset-image apache/superset
 x-superset-depends-on: &superset-depends-on
   - db
   - redis
@@ -22,6 +23,8 @@ x-superset-volumes:
   &superset-volumes # /app/pythonpath_docker will be appended to the PYTHONPATH in the final container
   - ./docker:/app/docker
   - superset_home:/app/superset_home
+  - ./superset/config.py:/app/superset/config.py
+  - ./superset/security/sec.py:/app/superset/security/sec.py
 
 version: "3.7"
 services:
@@ -47,7 +50,8 @@ services:
 
   superset:
     env_file: docker/.env
-    image: *superset-image
+#    image: *superset-image
+    build: ./custom_superset
     container_name: superset_app
     command: ["/app/docker/docker-bootstrap.sh", "app-gunicorn"]
     user: "root"
@@ -66,9 +70,12 @@ services:
     networks:
       - superset
       - netcube
+#    command: >
+#      bash -c "pip install authlib"
 
   superset-init:
-    image: *superset-image
+#    image: *superset-image
+    build: ./custom_superset
     container_name: superset_init
     command: ["/app/docker/docker-init.sh"]
     env_file: docker/.env
@@ -81,7 +88,8 @@ services:
       - superset
 
   superset-worker:
-    image: *superset-image
+#    image: *superset-image
+    build: ./custom_superset
     container_name: superset_worker
     command: ["/app/docker/docker-bootstrap.sh", "worker"]
     env_file: docker/.env
@@ -99,7 +107,8 @@ services:
       - superset
 
   superset-worker-beat:
-    image: *superset-image
+    build: ./custom_superset
+#    image: *superset-image
     container_name: superset_worker_beat
     command: ["/app/docker/docker-bootstrap.sh", "beat"]
     env_file: docker/.env
